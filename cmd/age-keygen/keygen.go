@@ -15,7 +15,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"filippo.io/age"
+	"github.com/johnkord/age"
 	"golang.org/x/term"
 )
 

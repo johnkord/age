@@ -7,19 +7,21 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"runtime/debug"
 	"strings"
 
-	"filippo.io/age"
-	"filippo.io/age/agessh"
-	"filippo.io/age/armor"
+	"github.com/johnkord/age"
+	"github.com/johnkord/age/agessh"
+	"github.com/johnkord/age/armor"
 	"golang.org/x/term"
 )
 
@@ -35,7 +37,7 @@ func (f *multiFlag) Set(value string) error {
 const usage = `Usage:
     age [--encrypt] (-r RECIPIENT | -R PATH)... [--armor] [-o OUTPUT] [INPUT]
     age [--encrypt] --passphrase [--armor] [-o OUTPUT] [INPUT]
-    age --decrypt [-i PATH]... [-o OUTPUT] [INPUT]
+    age --decrypt [-j] [-i PATH]... [-o OUTPUT] [INPUT]
 
 Options:
     -e, --encrypt               Encrypt the input to the output. Default if omitted.
@@ -46,6 +48,10 @@ Options:
     -r, --recipient RECIPIENT   Encrypt to the specified RECIPIENT. Can be repeated.
     -R, --recipients-file PATH  Encrypt to recipients listed at PATH. Can be repeated.
     -i, --identity PATH         Use the identity file at PATH. Can be repeated.
+    -k, --key-in-input          Expect structured data from INPUT for decrypt.
+                                Format: {
+                                  "keys":["key1","key2",...],
+                                  "ciphertext":"-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVu..."}
 
 INPUT defaults to standard input, and OUTPUT defaults to standard output.
 If OUTPUT exists, it will be overwritten.
@@ -90,6 +96,7 @@ func main() {
 		outFlag                          string
 		decryptFlag, encryptFlag         bool
 		passFlag, versionFlag, armorFlag bool
+		keyInInputFlag                   bool
 		recipientFlags, identityFlags    multiFlag
 		recipientsFileFlags              multiFlag
 	)
@@ -111,6 +118,8 @@ func main() {
 	flag.Var(&recipientsFileFlags, "recipients-file", "recipients file (can be repeated)")
 	flag.Var(&identityFlags, "i", "identity (can be repeated)")
 	flag.Var(&identityFlags, "identity", "identity (can be repeated)")
+	flag.BoolVar(&keyInInputFlag, "k", false, "key in input")
+	flag.BoolVar(&keyInInputFlag, "key-in-input", false, "key in input")
 	flag.Parse()
 
 	if versionFlag {
@@ -169,6 +178,9 @@ func main() {
 		if len(identityFlags) > 0 && passFlag {
 			errorf("-p/--passphrase can't be combined with -i/--identity")
 		}
+		if keyInInputFlag {
+			errorf("-k/--key-in-input can't be combined with -e/--encrypt")
+		}
 	}
 
 	var in io.Reader = os.Stdin
@@ -214,7 +226,7 @@ func main() {
 
 	switch {
 	case decryptFlag:
-		decrypt(identityFlags, in, out)
+		decrypt(identityFlags, keyInInputFlag, in, out)
 	case passFlag:
 		pass, err := passphrasePromptForEncryption()
 		if err != nil {
@@ -317,23 +329,47 @@ func encrypt(recipients []age.Recipient, in io.Reader, out io.Writer, withArmor 
 	}
 }
 
-func decrypt(keys []string, in io.Reader, out io.Writer) {
+type KeysAndData struct {
+	Keys []string `json:"keys"`
+	Data string   `json:"data"`
+}
+
+func decrypt(keys []string, keyInInput bool, in io.Reader, out io.Writer) {
 	identities := []age.Identity{
 		// If there is an scrypt recipient (it will have to be the only one and)
 		// this identity will be invoked.
 		&LazyScryptIdentity{passphrasePrompt},
 	}
 
-	for _, name := range keys {
-		ids, err := parseIdentitiesFile(name)
-		if err != nil {
-			errorf("reading %q: %v", name, err)
+	var keysAndData KeysAndData
+	fullData, err := ioutil.ReadAll(in)
+	//log.Printf("parsed fullData:\n%s", fullData)
+	var data []byte
+	if keyInInput {
+		json.Unmarshal(fullData, &keysAndData)
+		data, err = base64.StdEncoding.DecodeString(keysAndData.Data)
+		//log.Printf("parsed data:\n%s", data)
+		for _, key := range keysAndData.Keys {
+			//log.Printf("parsed key:\n%v", key)
+			ids, err := age.ParseIdentities(strings.NewReader(key))
+			if err != nil {
+				errorf("failed to read %q: %v", key, err)
+			}
+			identities = append(identities, ids...)
 		}
-		identities = append(identities, ids...)
+	} else {
+		data = fullData
+		for _, name := range keys {
+			ids, err := parseIdentitiesFile(name)
+			if err != nil {
+				errorf("reading %q: %v", name, err)
+			}
+			identities = append(identities, ids...)
+		}
 	}
 
-	rr := bufio.NewReader(in)
-	if start, _ := rr.Peek(len(armor.Header)); string(start) == armor.Header {
+	rr := bytes.NewBuffer(data)
+	if len(data) > len(armor.Header) && bytes.Compare(data[0:len(armor.Header)], []byte(armor.Header)) == 0 {
 		in = armor.NewReader(rr)
 	} else {
 		in = rr
@@ -410,7 +446,7 @@ func (l *lazyOpener) Close() error {
 
 func errorf(format string, v ...interface{}) {
 	log.Printf("age: error: "+format, v...)
-	log.Fatalf("age: report unexpected or unhelpful errors at https://filippo.io/age/report")
+	log.Fatalf("age: report unexpected or unhelpful errors at https://github.com/johnkord/age/report")
 }
 
 func warningf(format string, v ...interface{}) {
@@ -422,5 +458,5 @@ func errorWithHint(error string, hints ...string) {
 	for _, hint := range hints {
 		log.Printf("age: hint: %s", hint)
 	}
-	log.Fatalf("age: report unexpected or unhelpful errors at https://filippo.io/age/report")
+	log.Fatalf("age: report unexpected or unhelpful errors at https://github.com/johnkord/age/report")
 }

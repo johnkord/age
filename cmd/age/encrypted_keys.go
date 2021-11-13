@@ -13,7 +13,7 @@ import (
 	"os"
 	"runtime"
 
-	"filippo.io/age"
+	"github.com/johnkord/age"
 	"golang.org/x/term"
 )
 

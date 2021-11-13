@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"filippo.io/age"
+	"github.com/johnkord/age"
 )
 
 func TestVectors(t *testing.T) {

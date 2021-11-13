@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"testing"
 
-	"filippo.io/age/internal/format"
+	"github.com/johnkord/age/internal/format"
 )
 
 func TestStanzaMarshal(t *testing.T) {

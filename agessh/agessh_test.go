@@ -14,7 +14,7 @@ import (
 	"reflect"
 	"testing"
 
-	"filippo.io/age/agessh"
+	"github.com/johnkord/age/agessh"
 	"golang.org/x/crypto/ssh"
 )
 

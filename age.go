@@ -10,10 +10,10 @@
 // For most use cases, use the Encrypt and Decrypt functions with
 // X25519Recipient and X25519Identity. If passphrase encryption is required, use
 // ScryptRecipient and ScryptIdentity. For compatibility with existing SSH keys
-// use the filippo.io/age/agessh package.
+// use the github.com/johnkord/age/agessh package.
 //
 // Age encrypted files are binary and not malleable. For encoding them as text,
-// use the filippo.io/age/armor package.
+// use the github.com/johnkord/age/armor package.
 //
 // Key management
 //
@@ -54,8 +54,8 @@ import (
 	"fmt"
 	"io"
 
-	"filippo.io/age/internal/format"
-	"filippo.io/age/internal/stream"
+	"github.com/johnkord/age/internal/format"
+	"github.com/johnkord/age/internal/stream"
 )
 
 // An Identity is passed to Decrypt to unwrap an opaque file key from a

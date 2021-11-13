@@ -18,7 +18,7 @@ import (
 	"errors"
 	"io"
 
-	"filippo.io/age/internal/format"
+	"github.com/johnkord/age/internal/format"
 )
 
 const (
