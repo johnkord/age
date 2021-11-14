@@ -4,7 +4,7 @@
 [![man page](https://img.shields.io/badge/man-page-lightgrey)](https://github.com/johnkord/age/age.1)
 
 # Fork information (from @johnkord)
-I made some minor modifications to the `age` tool so that I could invoke its `decrypt` method from a non-tty environment (like from within emacs). I am currently using age to encrypt my `org-mode` notes, and I have provided two emacs lisp functions below that I use to decrypt/encrypt within memory.
+I made some minor modifications to the `age` tool so that I could invoke its `decrypt` method from a non-tty environment (like from within emacs). I am currently using `age` to encrypt my `org-mode` notes, and I have provided some emacs lisp functions below that I use to decrypt/encrypt within memory.
 
 Encryption was simple: simply pipe the current buffer into `age -a -r PUBKEY` and then replace the current buffer with the output.
 Decryption was a bit more difficult, as I need to specify the private key. However, I don't want to keep my private key file decrypted on my filesystem, and I can't specify a passphrase to the `age` cli from within emacs (as there is no tty), so I decided to modify `age` to optionally accept structured data (json) from stdin. This can be specified using `age`'s new `-k` option.
@@ -83,7 +83,7 @@ Now personally, In my `.emacs.d/init.el` file I've defined these emacs lisp func
 ; need private key to not be written to command line, so therefore the json needs to be constructed in emacs before written to pipe!
 ; create buffer 1 by taking current buffer and base64 encoding it
 ; create buffer 2 -> add intro text -> add key -> insert buffer 1 -> append end text -> pipe to age
-(setq make-backup-files nil)
+(setq make-backup-files nil) ; I think this tells emacs to not temporarily save buffers to disks. Not good for the kind of promise I want!
 (global-set-key (kbd "C-x e") 'encrypt-age-my-key)
 (global-set-key (kbd "C-x d") 'decrypt-age)
 ```
