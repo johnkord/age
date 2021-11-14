@@ -3,6 +3,102 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/johnkord/age.svg)](https://pkg.go.dev/github.com/johnkord/age)
 [![man page](https://img.shields.io/badge/man-page-lightgrey)](https://github.com/johnkord/age/age.1)
 
+# Fork information (from @johnkord)
+I made some minor modifications to the `age` tool so that I could invoke its `decrypt` method from a non-tty environment (like from within emacs). I am currently using age to encrypt my `org-mode` notes, and I have provided two emacs lisp functions below that I use to decrypt/encrypt within memory.
+
+Encryption was simple: simply pipe the current buffer into `age -a -r PUBKEY` and then replace the current buffer with the output.
+Decryption was a bit more difficult, as I need to specify the private key. However, I don't want to keep my private key file decrypted on my filesystem, and I can't specify a passphrase to the `age` cli from within emacs (as there is no tty), so I decided to modify `age` to optionally accept structured data (json) from stdin. This can be specified using `age`'s new `-k` option.
+
+The structured data currently expects the structure:
+```json
+{
+    "keys": ["KEY_1", "KEY_2"],
+    "data": "BASE64_ENCODED_ENCRYPTED_DATA"
+}
+```
+
+When the `-k` option is specified, `age` will expect this kind of structured data from its input.
+
+Now personally, In my `.emacs.d/init.el` file I've defined these emacs lisp functions:
+
+```lisp
+(defun encrypt-age (pubkey)
+  (interactive "sPubkey:")
+  (shell-command-on-region
+   (point-min)
+   (point-max)
+   (concat "age -a -r " pubkey)
+   (current-buffer)
+   t
+   "*Enc Error Buffer*"
+   t))
+
+(defun encrypt-age-my-key ()
+  (interactive)
+  (shell-command-on-region
+   (point-min)
+   (point-max)
+   (concat "age -a -r age18hsrm9vzj9nw7um46x4v6hz4f3xd35l5nwa4p6dvn4zc64m4d4wsws6a78")
+   (current-buffer)
+   t
+   "*Enc Error Buffer*"
+   t))
+
+(defun b64-encode ()
+  (copy-to-buffer "*b64buffer*" (point-min) (point-max))
+  (with-current-buffer "*b64buffer*"
+    (shell-command-on-region
+     (point-min)
+     (point-max)
+     (concat "base64 --wrap=0")
+     (current-buffer)
+     t
+     "*B64 Error Buffer*"
+     t)))
+
+(defun decrypt-age (privatekey)
+  (interactive "sPrivateKey:")
+  (b64-encode)
+  (generate-new-buffer "*decryptBuffer*")
+  (with-current-buffer "*decryptBuffer*"
+    (insert "{\"keys\":[\"")
+    (insert privatekey)
+    (insert "\"], \"data\":\"")
+    (with-current-buffer "*b64buffer*"
+      (append-to-buffer "*decryptBuffer*" (point-min) (point-max)))
+    (insert "\"}")
+    (shell-command-on-region
+      (point-min)
+      (point-max)
+      "age -d -k"
+      (current-buffer)
+      t
+      "*Dec Error Buffer*"
+      t))
+  (erase-buffer)
+  (insert-buffer "*decryptBuffer*")
+  (kill-buffer "*decryptBuffer*")
+  (kill-buffer "*b64buffer*"))
+
+; need private key to not be written to command line, so therefore the json needs to be constructed in emacs before written to pipe!
+; create buffer 1 by taking current buffer and base64 encoding it
+; create buffer 2 -> add intro text -> add key -> insert buffer 1 -> append end text -> pipe to age
+(setq make-backup-files nil)
+(global-set-key (kbd "C-x e") 'encrypt-age-my-key)
+(global-set-key (kbd "C-x d") 'decrypt-age)
+```
+
+I haven't written many emacs lisp functions before, so definitely file an issue if you have some ideas as to how this could use some improvement :)
+
+Also, if you end up using something like this, you will probably want to change that public key hard-coded in `encrypt-age-my-key` to one of your own!
+
+In the end, this satisfies my requirements, which are:
+- No need to keep an `age` private key decrypted somewhere in a file
+- Not passing an `age` private key through a command line parameter, which is visible to processes on the system
+- Make it possible for emacs (or other tools) to open an encrypted file, decrypt the file in memory, make edits to the file in memory, and then re-encrypt the file before writing the file out to disk again
+
+# Normal documentation from original age developers:
+
 age is a simple, modern and secure file encryption tool, format, and Go library.
 
 It features small explicit keys, no config options, and UNIX-style composability.
