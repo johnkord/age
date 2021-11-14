@@ -49,9 +49,8 @@ Options:
     -R, --recipients-file PATH  Encrypt to recipients listed at PATH. Can be repeated.
     -i, --identity PATH         Use the identity file at PATH. Can be repeated.
     -k, --key-in-input          Expect structured data from INPUT for decrypt.
-                                Format: {
-                                  "keys":["key1","key2",...],
-                                  "ciphertext":"-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVu..."}
+                                Format: {"keys":["key1","key2",...],
+                                  "ciphertext":"BASE64_ENCODED_ENCRYPTED_DATA"}
 
 INPUT defaults to standard input, and OUTPUT defaults to standard output.
 If OUTPUT exists, it will be overwritten.
